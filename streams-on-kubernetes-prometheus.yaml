@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-deployment
+  labels:
+    app: prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/prometheus
+          ports:
+            - containerPort: 9090
+      volumes:
+        - name: config-volume
+          configMap:
+            name: prometheus-server-config
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: prometheus-service
+spec:
+  selector:
+    app: prometheus
+  type: LoadBalancer
+  ports:
+    - name: promui
+      protocol: TCP
+      port: 9090
+      targetPort: 9090
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-server-config
+  labels:
+    name: prometheus-server-config
+  namespace: default
+data:
+  prometheus.yml: |-
+    global:
+      scrape_interval: 10s
+      evaluation_interval: 10s
+    scrape_configs:
+      - job_name: 'lag-exporter'
+        static_configs:
+        - targets: ['lag-exporter-service:8000']
+          labels:
+            namespace: 'default'
+            pod: 'stockstat-2'
+        
+
+      - job_name: 'kafka-streams'
+        static_configs:
+        - targets:
+          - 'kstreams-metrics:9000'
+          labels:
+            namespace: 'default'
+            pod: 'stockstat-2'

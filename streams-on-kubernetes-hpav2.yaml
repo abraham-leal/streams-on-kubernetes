@@ -1,0 +1,44 @@
+apiVersion: "autoscaling/v2beta2"
+kind: "HorizontalPodAutoscaler"
+metadata:
+  name: "stockstat-2-autoscaler"
+  namespace: "default"
+  annotations:
+    metric-config.external.prometheus-query.prometheus/prometheus-server: http://prometheus-service.default.svc.cluster.local:9090
+    metric-config.external.prometheus-query.prometheus/max-lag: |
+      sum(kafka_consumergroup_group_max_lag{group="stockstat-2"})
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: "StatefulSet"
+    name: "stockstat-2"
+  metrics:
+    - type: External
+      external:
+        metric:
+          name: prometheus-query
+          selector:
+            matchLabels:
+              query-name: max-lag
+        target:
+          type: AverageValue
+          averageValue: "200"
+  maxReplicas: 5
+  minReplicas: 1
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Pods
+          value: 4
+          periodSeconds: 15
+      selectPolicy: Max

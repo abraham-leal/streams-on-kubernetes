@@ -1,5 +1,6 @@
 package com.shapira.examples.streams.stockstats;
 
+import com.leal.examples.streams.status.StreamsStatus;
 import com.shapira.examples.streams.stockstats.serde.JsonDeserializer;
 import com.shapira.examples.streams.stockstats.serde.JsonSerializer;
 import com.shapira.examples.streams.stockstats.serde.WrapperSerde;
@@ -7,6 +8,7 @@ import com.shapira.examples.streams.stockstats.model.Trade;
 import com.shapira.examples.streams.stockstats.model.TradeStats;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.DescribeClusterResult;
+import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.utils.Bytes;
@@ -21,6 +23,8 @@ import org.apache.kafka.streams.kstream.TimeWindows;
 import org.apache.kafka.streams.kstream.Windowed;
 import org.apache.kafka.streams.kstream.WindowedSerdes;
 import org.apache.kafka.streams.state.WindowStore;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 
 import java.util.Properties;
 
@@ -33,6 +37,8 @@ public class StockStatsExample {
 
     public static void main(String[] args) throws Exception {
 
+        Logger.getRootLogger().setLevel(Level.INFO);
+
         Properties props;
         if (args.length==1)
             props = LoadConfigs.loadConfig(args[0]);
@@ -42,6 +48,7 @@ public class StockStatsExample {
         props.put(StreamsConfig.APPLICATION_ID_CONFIG, "stockstat-2");
         props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
         props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, TradeSerde.class.getName());
+        props.put(StreamsConfig.METRICS_RECORDING_LEVEL_CONFIG, "DEBUG");
 
         // setting offset reset to earliest so that we can re-run the demo code with the same pre-loaded data
         // Note: To re-run the demo, you need to use the offset reset tool:
@@ -84,8 +91,13 @@ public class StockStatsExample {
 
         streams.start();
 
+        StreamsStatus exposeStatus = new StreamsStatus(streams);
+        exposeStatus.start();
+
+
         // Add shutdown hook to respond to SIGTERM and gracefully close Kafka Streams
         Runtime.getRuntime().addShutdownHook(new Thread(streams::close));
+        Runtime.getRuntime().addShutdownHook(new Thread(exposeStatus::stop));
 
     }
 

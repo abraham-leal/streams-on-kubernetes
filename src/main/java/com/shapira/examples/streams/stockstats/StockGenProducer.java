@@ -5,6 +5,8 @@ import com.shapira.examples.streams.stockstats.model.Trade;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -19,6 +21,7 @@ public class StockGenProducer {
     public static void main(String[] args) throws Exception {
 
         System.out.println("Press CTRL-C to stop generating data");
+        Logger.getRootLogger().setLevel(Level.INFO);
 
 
         // add shutdown hook

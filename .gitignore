@@ -41,3 +41,7 @@ Thumbs.db
 .idea
 target
 kafka-streams-stockstats.iml
+
+# Sensitive #
+#############
+src/main/jib/root/

@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lag-exporter
+  labels:
+    app: lag-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lag-exporter
+  template:
+    metadata:
+      labels:
+        app: lag-exporter
+    spec:
+      containers:
+        - name: prometheus
+          image: lightbend/kafka-lag-exporter:0.6.2
+          volumeMounts:
+            - name: config-volume
+              mountPath: /opt/docker/conf/
+          ports:
+            - containerPort: 9090
+      volumes:
+        - name: config-volume
+          configMap:
+            name: lag-exporter-config
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: lag-exporter-service
+spec:
+  selector:
+    app: lag-exporter
+  ports:
+    - name: exporter
+      protocol: TCP
+      port: 9999
+      targetPort: 9999
+    - name: prom-exporter
+      protocol: TCP
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lag-exporter-config
+  labels:
+    name: lag-exporter-config
+  namespace: default
+data:
+  application.conf: |-
+    kafka-lag-exporter {
+      port = 9999
+
+      client-group-id = "stockstat-2"
+      lookup-table-size = 120
+
+      clusters = [
+        {
+          name = "ccloud-azure"
+          bootstrap-brokers = "pkc-lgwgm.eastus2.azure.confluent.cloud:9092"
+
+          admin-client-properties = {
+            client.id = "exporter-admin"
+            security.protocol = "SASL_SSL"
+            sasl.mechanism = "PLAIN"
+            sasl.jaas.config = "org.apache.kafka.common.security.plain.PlainLoginModule   required username="VIFZD3F6KSMRFHA5"   password="b2om87CpZucb6CraoKRhmLuE6Udevf2SsLUnD2zCpevPIwKeFVByCOtBIMpaVN52";"
+          }
+
+          consumer-properties = {
+            client.id = "exporter-consumer"
+            security.protocol = "SASL_SSL"
+            sasl.mechanism = "PLAIN"
+            sasl.jaas.config = "org.apache.kafka.common.security.plain.PlainLoginModule   required username="VIFZD3F6KSMRFHA5"   password="b2om87CpZucb6CraoKRhmLuE6Udevf2SsLUnD2zCpevPIwKeFVByCOtBIMpaVN52";"
+          }
+        }
+      ]
+    }

@@ -4,13 +4,13 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>kafka-streams-stockstats</groupId>
-    <artifactId>kafka-streams-stockstats</artifactId>
-    <version>1.1-SNAPSHOT</version>
+    <groupId>streams-on-kubernetes</groupId>
+    <artifactId>streams-on-kubernetes</artifactId>
+    <version>1.0-SNAPSHOT</version>
 
     <properties>
-        <kafka.version>2.0.0-cp1</kafka.version>
-        <confluent.version>5.0.0</confluent.version>
+        <kafka.version>2.5.0</kafka.version>
+        <confluent.version>5.5.1</confluent.version>
         <avro.version>1.8.2</avro.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
@@ -51,7 +51,32 @@ place log4j.jar on your class path. -->
             <version>1.2.16</version>
             <scope>runtime</scope>
         </dependency>
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-servlet</artifactId>
+            <version>9.4.30.v20200611</version>
+        </dependency>
+        <dependency>
+            <groupId>org.glassfish.jersey.containers</groupId>
+            <artifactId>jersey-container-servlet-core</artifactId>
+            <version>2.30.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.glassfish.jersey.inject</groupId>
+            <artifactId>jersey-hk2</artifactId>
+            <version>2.28</version>
+        </dependency>
+        <dependency>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+            <version>1.2.16</version>
+        </dependency>
+
     </dependencies>
+
+
+
+
     <build>
         <plugins>
             <plugin>
@@ -81,21 +106,31 @@ place log4j.jar on your class path. -->
             <plugin>
                 <groupId>com.google.cloud.tools</groupId>
                 <artifactId>jib-maven-plugin</artifactId>
-                <version>0.9.10</version>
+                <version>2.4.0</version>
                 <configuration>
                     <!-- add the config file I'm using. You can also remove this and place your file in src/main/jib -->
-                    <extraDirectory>/Users/gwen/.ccloud</extraDirectory>
                     <from>
-                        <image>gcr.io/distroless/java:debug</image>
+                        <image>openjdk:8</image>
                     </from>
                     <to>
-                        <image>gcr.io/gwen-test-202722/kafka-streams-stockstat</image>
+                        <image>abereg.azurecr.io/streams-on-k8</image>
+                        <auth>
+                            <username>abeReg</username>
+                            <password>TDGSBYV=K8b+VhKn5syHJ7ewu2Waf6pD</password>
+                        </auth>
                     </to>
                     <container>
                         <mainClass>com.shapira.examples.streams.stockstats.StockStatsExample</mainClass>
-                        <args>
-                            <arg>/config</arg>
-                        </args>
+                        <jvmFlags>
+                            <jvmFlag>-Dcom.sun.management.jmxremote</jvmFlag>
+                            <jvmFlag>-Dcom.sun.management.jmxremote.port=8008</jvmFlag>
+                            <jvmFlag>-Dcom.sun.management.jmxremote.authenticate=false</jvmFlag>
+                            <jvmFlag>-javaagent:/exporter/jmx_prometheus_javaagent-0.13.0.jar=9000:/exporter/streams-jmx.yaml</jvmFlag>
+                        </jvmFlags>
+                        <ports>
+                            <port>8008</port>
+                            <port>9000</port>
+                        </ports>
                     </container>
                 </configuration>
             </plugin>

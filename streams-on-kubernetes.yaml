@@ -1,0 +1,64 @@
+---
+apiVersion: apps/v1
+kind: "StatefulSet"
+metadata:
+  name: "stockstat-2"
+  namespace: "default"
+  labels:
+    app: "stockstat-2"
+spec:
+  replicas: 2
+  podManagementPolicy: "Parallel"
+  serviceName: "stockstat-2"
+  selector:
+    matchLabels:
+      app: "stockstat-2"
+  volumeClaimTemplates:
+    - metadata:
+        name: rocksdb
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 1Gi
+  template:
+    metadata:
+      labels:
+        app: "stockstat-2"
+    spec:
+      containers:
+      - name: "stockstat-2"
+        ports:
+          - containerPort: 9000
+        image: "abereg.azurecr.io/streams-on-k8:latest"
+        env:
+        - name: JAVA_TOOL_OPTIONS
+          value: -DLOGLEVEL=INFO
+        livenessProbe:
+          httpGet:
+            path: /streams-check/liveness
+            port: 7000
+          initialDelaySeconds: 3
+          periodSeconds: 5
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /streams-check/readiness
+            port: 7000
+          initialDelaySeconds: 3
+          periodSeconds: 5
+          failureThreshold: 5
+---
+  kind: Service
+  apiVersion: v1
+  metadata:
+    name: "kstreams-metrics"
+  spec:
+    clusterIP: "None"
+    selector:
+      app: "stockstat-2"
+    ports:
+      - name: kstreams-metrics
+        protocol: TCP
+        port: 9000
+        targetPort: 9000

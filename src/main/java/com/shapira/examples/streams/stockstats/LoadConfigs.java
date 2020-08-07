@@ -10,7 +10,7 @@ import java.util.Properties;
 
 /**
  * Load configuration from a file. This is mainly intended for connection info, so I can switch between clusters without recompile
- * But you can put other client configation here, but we may override it...
+ * But you can put other client configuration here, but we may override it...
  */
 public class LoadConfigs {
 
