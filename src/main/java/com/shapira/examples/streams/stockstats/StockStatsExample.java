@@ -8,7 +8,6 @@ import com.shapira.examples.streams.stockstats.model.Trade;
 import com.shapira.examples.streams.stockstats.model.TradeStats;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.DescribeClusterResult;
-import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.utils.Bytes;
@@ -56,15 +55,15 @@ public class StockStatsExample {
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
         // creating an AdminClient and checking the number of brokers in the cluster, so I'll know how many replicas we want...
-
         AdminClient ac = AdminClient.create(props);
         DescribeClusterResult dcr = ac.describeCluster();
         int clusterSize = dcr.nodes().get().size();
+        ac.close();
 
         if (clusterSize<3)
-            props.put("replication.factor",clusterSize);
+            props.put(StreamsConfig.REPLICATION_FACTOR_CONFIG,clusterSize);
         else
-            props.put("replication.factor",3);
+            props.put(StreamsConfig.REPLICATION_FACTOR_CONFIG,3);
 
         StreamsBuilder builder = new StreamsBuilder();
 
@@ -73,11 +72,11 @@ public class StockStatsExample {
         KStream<Windowed<String>, TradeStats> stats = source
                 .groupByKey()
                 .windowedBy(TimeWindows.of(5000).advanceBy(1000))
-                .<TradeStats>aggregate(() -> new TradeStats(),(k, v, tradestats) -> tradestats.add(v),
+                .<TradeStats>aggregate(TradeStats::new,(k, v, tradestats) -> tradestats.add(v),
                         Materialized.<String, TradeStats, WindowStore<Bytes, byte[]>>as("trade-aggregates")
                                 .withValueSerde(new TradeStatsSerde()))
                 .toStream()
-                .mapValues((trade) -> trade.computeAvgPrice());
+                .mapValues(TradeStats::computeAvgPrice);
 
         stats.to("stockstats-output", Produced.keySerde(WindowedSerdes.timeWindowedSerdeFrom(String.class)));
 
@@ -85,19 +84,16 @@ public class StockStatsExample {
 
         KafkaStreams streams = new KafkaStreams(topology, props);
 
-        System.out.println(topology.describe());
-
         streams.cleanUp();
-
         streams.start();
 
         StreamsStatus exposeStatus = new StreamsStatus(streams);
         exposeStatus.start();
 
 
-        // Add shutdown hook to respond to SIGTERM and gracefully close Kafka Streams
-        Runtime.getRuntime().addShutdownHook(new Thread(streams::close));
+        // Add shutdown hooks to respond to SIGTERM and gracefully close Kafka Streams
         Runtime.getRuntime().addShutdownHook(new Thread(exposeStatus::stop));
+        Runtime.getRuntime().addShutdownHook(new Thread(streams::close));
 
     }
 

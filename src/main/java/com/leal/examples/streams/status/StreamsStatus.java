@@ -109,7 +109,6 @@ public class StreamsStatus {
         Response check = Response.serverError().build();
 
         HashMap<String, MetricName> restoreConsumers = new HashMap<>();
-
         for (ThreadMetadata thread : this.app.localThreadsMetadata()) {
             MetricName restoreConsumerLag = new MetricName("records-lag-max",
                     "consumer-fetch-manager-metrics",
@@ -125,7 +124,6 @@ public class StreamsStatus {
         }
 
         check = Response.ok().build();
-
         return check;
     }
 

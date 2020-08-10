@@ -23,7 +23,7 @@ spec:
         target:
           type: AverageValue
           averageValue: "200"
-  maxReplicas: 5
+  maxReplicas: 6
   minReplicas: 1
   behavior:
     scaleDown:
@@ -33,7 +33,7 @@ spec:
           value: 100
           periodSeconds: 15
     scaleUp:
-      stabilizationWindowSeconds: 0
+      stabilizationWindowSeconds: 300
       policies:
         - type: Percent
           value: 100
