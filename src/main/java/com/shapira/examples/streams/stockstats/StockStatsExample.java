@@ -1,5 +1,7 @@
 package com.shapira.examples.streams.stockstats;
 
+import com.leal.examples.streams.handlers.sendToKafka;
+import com.leal.examples.streams.handlers.writeToLog;
 import com.leal.examples.streams.status.StreamsStatus;
 import com.shapira.examples.streams.stockstats.serde.JsonDeserializer;
 import com.shapira.examples.streams.stockstats.serde.JsonSerializer;
@@ -11,20 +13,14 @@ import org.apache.kafka.clients.admin.DescribeClusterResult;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.utils.Bytes;
-import org.apache.kafka.streams.KafkaStreams;
-import org.apache.kafka.streams.StreamsConfig;
-import org.apache.kafka.streams.Topology;
-import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.StreamsBuilder;
-import org.apache.kafka.streams.kstream.Materialized;
-import org.apache.kafka.streams.kstream.Produced;
-import org.apache.kafka.streams.kstream.TimeWindows;
-import org.apache.kafka.streams.kstream.Windowed;
-import org.apache.kafka.streams.kstream.WindowedSerdes;
+import org.apache.kafka.streams.*;
+import org.apache.kafka.streams.kstream.*;
 import org.apache.kafka.streams.state.WindowStore;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.util.Properties;
 
 /**
@@ -33,6 +29,7 @@ import java.util.Properties;
  * Another with the top-3 stocks with lowest minimum ask every minute
  */
 public class StockStatsExample {
+    private static final org.slf4j.Logger log = LoggerFactory.getLogger(StockStatsExample.class);
 
     public static void main(String[] args) throws Exception {
 
@@ -47,7 +44,10 @@ public class StockStatsExample {
         props.put(StreamsConfig.APPLICATION_ID_CONFIG, "stockstat-2");
         props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
         props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, TradeSerde.class.getName());
-        props.put(StreamsConfig.METRICS_RECORDING_LEVEL_CONFIG, "DEBUG");
+        props.put(StreamsConfig.METRICS_RECORDING_LEVEL_CONFIG, "INFO");
+        props.put(StreamsConfig.NUM_STREAM_THREADS_CONFIG, 2);
+        props.put(StreamsConfig.DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG, sendToKafka.class);
+        props.put(StreamsConfig.DEFAULT_PRODUCTION_EXCEPTION_HANDLER_CLASS_CONFIG, writeToLog.class);
 
         // setting offset reset to earliest so that we can re-run the demo code with the same pre-loaded data
         // Note: To re-run the demo, you need to use the offset reset tool:
@@ -65,24 +65,14 @@ public class StockStatsExample {
         else
             props.put(StreamsConfig.REPLICATION_FACTOR_CONFIG,3);
 
-        StreamsBuilder builder = new StreamsBuilder();
-
-        KStream<String, Trade> source = builder.stream(Constants.STOCK_TOPIC);
-
-        KStream<Windowed<String>, TradeStats> stats = source
-                .groupByKey()
-                .windowedBy(TimeWindows.of(5000).advanceBy(1000))
-                .<TradeStats>aggregate(TradeStats::new,(k, v, tradestats) -> tradestats.add(v),
-                        Materialized.<String, TradeStats, WindowStore<Bytes, byte[]>>as("trade-aggregates")
-                                .withValueSerde(new TradeStatsSerde()))
-                .toStream()
-                .mapValues(TradeStats::computeAvgPrice);
-
-        stats.to("stockstats-output", Produced.keySerde(WindowedSerdes.timeWindowedSerdeFrom(String.class)));
-
-        Topology topology = builder.build();
+        Topology topology = getTopology().build();
 
         KafkaStreams streams = new KafkaStreams(topology, props);
+
+        streams.setUncaughtExceptionHandler((t,e) -> {
+            log.warn("This is bound to die, so I just wanted to say goodbye... here is the culprit though: {}",
+                    e.getMessage());
+        });
 
         streams.cleanUp();
         streams.start();
@@ -95,6 +85,35 @@ public class StockStatsExample {
         Runtime.getRuntime().addShutdownHook(new Thread(exposeStatus::stop));
         Runtime.getRuntime().addShutdownHook(new Thread(streams::close));
 
+    }
+
+    @SuppressWarnings("unchecked")
+    public static StreamsBuilder getTopology () {
+        Predicate<String, Trade> isNotValidRecord = (key, value) -> (value.ticker == null && value.type == null);
+        Predicate<String, Trade> isValidRecord = (key, value) -> (value.ticker != null && value.type != null);
+
+        StreamsBuilder builder = new StreamsBuilder();
+
+        KStream<String, Trade> source = builder.stream(Constants.STOCK_TOPIC);
+
+        KStream<String, Trade>[] healthCheck = source // We check whether this record will throw any exceptions
+                .branch(isNotValidRecord,isValidRecord); // by evaluating the predicates before entering the flow
+
+        healthCheck[0].to("dlq-stockstat-noncompliant"); // We send non compliant records to a topic named
+        // dlq-stockstat-noncompliant
+
+        KStream<Windowed<String>, TradeStats> stats = healthCheck[1]
+                .groupByKey()
+                .windowedBy(TimeWindows.of(Duration.ofMillis(5000)).advanceBy(Duration.ofMillis(1000)))
+                .aggregate(TradeStats::new,(k, v, tradestats) -> tradestats.add(v),
+                        Materialized.<String, TradeStats, WindowStore<Bytes, byte[]>>as("trade-aggregates")
+                                .withValueSerde(new TradeStatsSerde()))
+                .toStream()
+                .mapValues(TradeStats::computeAvgPrice);
+
+        stats.to("stockstats-output", Produced.keySerde(WindowedSerdes.timeWindowedSerdeFrom(String.class)));
+
+        return builder;
     }
 
     static public final class TradeSerde extends WrapperSerde<Trade> {

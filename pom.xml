@@ -9,7 +9,7 @@
     <version>1.0-SNAPSHOT</version>
 
     <properties>
-        <kafka.version>2.5.0</kafka.version>
+        <kafka.version>2.6.0</kafka.version>
         <confluent.version>5.5.1</confluent.version>
         <avro.version>1.8.2</avro.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -32,6 +32,12 @@
             <groupId>org.apache.kafka</groupId>
             <artifactId>kafka-streams</artifactId>
             <version>${kafka.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-streams-test-utils</artifactId>
+            <version>${kafka.version}</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.google.code.gson</groupId>
@@ -70,6 +76,18 @@ place log4j.jar on your class path. -->
             <groupId>log4j</groupId>
             <artifactId>log4j</artifactId>
             <version>1.2.16</version>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.12</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>RELEASE</version>
+            <scope>test</scope>
         </dependency>
 
     </dependencies>
@@ -116,7 +134,7 @@ place log4j.jar on your class path. -->
                         <image>abereg.azurecr.io/streams-on-k8</image>
                         <auth>
                             <username>abeReg</username>
-                            <password>TDGSBYV=K8b+VhKn5syHJ7ewu2Waf6pD</password>
+                            <password>ebBU6dUnssIqQnHu23kr0R6waCOtD+3Z</password>
                         </auth>
                     </to>
                     <container>
@@ -125,7 +143,7 @@ place log4j.jar on your class path. -->
                             <jvmFlag>-Dcom.sun.management.jmxremote</jvmFlag>
                             <jvmFlag>-Dcom.sun.management.jmxremote.port=8008</jvmFlag>
                             <jvmFlag>-Dcom.sun.management.jmxremote.authenticate=false</jvmFlag>
-                            <jvmFlag>-javaagent:/exporter/jmx_prometheus_javaagent-0.13.0.jar=9000:/exporter/streams-jmx.yaml</jvmFlag>
+                            <jvmFlag>-javaagent:/exporter/jmx_prometheus_javaagent-0.13.0.jar=9000:/exporter/configs/streams-jmx.yaml</jvmFlag>
                         </jvmFlags>
                         <ports>
                             <port>8008</port>

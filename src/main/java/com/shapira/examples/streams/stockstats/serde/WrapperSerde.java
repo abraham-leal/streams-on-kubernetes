@@ -30,12 +30,12 @@ public class WrapperSerde<T> implements Serde<T> {
     }
 
     @Override
-    public Serializer<T> serializer() {
+    public  Serializer<T> serializer() {
         return serializer;
     }
 
     @Override
-    public Deserializer<T> deserializer() {
+    public  Deserializer<T> deserializer() {
         return deserializer;
     }
 }

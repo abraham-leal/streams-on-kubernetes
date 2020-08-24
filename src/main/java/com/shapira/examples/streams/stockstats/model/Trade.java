@@ -5,8 +5,8 @@ package com.shapira.examples.streams.stockstats.model;
  */
 public class Trade {
 
-    String type;
-    String ticker;
+    public String type;
+    public String ticker;
     double price;
     int size;
 

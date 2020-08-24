@@ -23,22 +23,22 @@ spec:
         target:
           type: AverageValue
           averageValue: "200"
-  maxReplicas: 6
+  maxReplicas: 3
   minReplicas: 1
   behavior:
     scaleDown:
-      stabilizationWindowSeconds: 300
+      stabilizationWindowSeconds: 45
       policies:
         - type: Percent
           value: 100
           periodSeconds: 15
     scaleUp:
-      stabilizationWindowSeconds: 300
+      stabilizationWindowSeconds: 45
       policies:
         - type: Percent
-          value: 100
+          value: 50
           periodSeconds: 15
         - type: Pods
-          value: 4
+          value: 1
           periodSeconds: 15
       selectPolicy: Max

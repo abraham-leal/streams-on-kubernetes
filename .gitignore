@@ -45,3 +45,6 @@ kafka-streams-stockstats.iml
 # Sensitive #
 #############
 src/main/jib/root/
+pom.xml
+lag-exporter-config
+credentials

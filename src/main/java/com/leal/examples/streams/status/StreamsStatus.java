@@ -2,7 +2,9 @@ package com.leal.examples.streams.status;
 
 import org.apache.kafka.common.MetricName;
 import org.apache.kafka.streams.KafkaStreams;
+import org.apache.kafka.streams.StoreQueryParameters;
 import org.apache.kafka.streams.processor.ThreadMetadata;
+import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
@@ -90,7 +92,10 @@ public class StreamsStatus {
             check = Response.ok().build();
             logger.debug("Streams app is running");
             for (ThreadMetadata x : myThreadsStatus){
-                if (!x.threadState().equals("RUNNING")){
+                if (!(x.threadState().equalsIgnoreCase("RUNNING") ||
+                x.threadState().equalsIgnoreCase("STARTING") ||
+                x.threadState().equalsIgnoreCase("PARTITIONS_REVOKED") ||
+                x.threadState().equalsIgnoreCase("PARTITIONS_ASSIGNED"))){
                     logger.debug("At least one thread in the Streams app is dead, returning bad response.");
                     check = Response.serverError().build();
                 }
@@ -108,17 +113,9 @@ public class StreamsStatus {
     public Response getReadiness() {
         Response check = Response.serverError().build();
 
-        HashMap<String, MetricName> restoreConsumers = new HashMap<>();
         for (ThreadMetadata thread : this.app.localThreadsMetadata()) {
-            MetricName restoreConsumerLag = new MetricName("records-lag-max",
-                    "consumer-fetch-manager-metrics",
-                    "The maximum lag in terms of number of records for any partition in this window",
-                    Collections.singletonMap("client-id", thread.restoreConsumerClientId()));
-            restoreConsumers.put(thread.restoreConsumerClientId(), restoreConsumerLag);
-        }
-
-        for (String client : restoreConsumers.keySet()) {
-            if (!Double.isNaN((double) this.app.metrics().get(restoreConsumers.get(client)).metricValue())) {
+            if (!thread.threadState().equalsIgnoreCase("RUNNING")){
+                logger.debug("At least one thread in the Streams app is not running, returning bad response.");
                 return check;
             }
         }
@@ -126,5 +123,4 @@ public class StreamsStatus {
         check = Response.ok().build();
         return check;
     }
-
 }

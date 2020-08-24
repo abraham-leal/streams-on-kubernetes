@@ -13,6 +13,7 @@ spec:
   selector:
     matchLabels:
       app: "stockstat-2"
+  # Set the volume we want for our application
   volumeClaimTemplates:
     - metadata:
         name: rocksdb
@@ -26,14 +27,35 @@ spec:
       labels:
         app: "stockstat-2"
     spec:
+      volumes:
+        #Pass in the sensitive properties for our streams application
+        - name: secret-volume
+          secret:
+            secretName: streams-credentials
+        #Declare our configmap for jmx metrics as a volume
+        - name: streams-jmx-config-volume
+          configMap:
+            name: kstreams-jmx-config
       containers:
       - name: "stockstat-2"
+        # Mount the configmap and secret
+        volumeMounts:
+          - name: streams-jmx-config-volume
+            mountPath: /exporter/configs/
+          - name: secret-volume
+            mountPath: /root/.ccloud/
+          - name: rocksdb
+            mountPath: /var/kafka-streams/
+        # Expose port 9000
         ports:
           - containerPort: 9000
         image: "abereg.azurecr.io/streams-on-k8:latest"
+        imagePullPolicy: Always
+        # Set env variables
         env:
         - name: JAVA_TOOL_OPTIONS
           value: -DLOGLEVEL=INFO
+        # Set liveness probe configs
         livenessProbe:
           httpGet:
             path: /streams-check/liveness
@@ -41,6 +63,7 @@ spec:
           initialDelaySeconds: 3
           periodSeconds: 5
           failureThreshold: 5
+        # Set readiness probe configs
         readinessProbe:
           httpGet:
             path: /streams-check/readiness
@@ -49,16 +72,95 @@ spec:
           periodSeconds: 5
           failureThreshold: 5
 ---
-  kind: Service
-  apiVersion: v1
-  metadata:
-    name: "kstreams-metrics"
-  spec:
-    clusterIP: "None"
-    selector:
-      app: "stockstat-2"
-    ports:
-      - name: kstreams-metrics
-        protocol: TCP
-        port: 9000
-        targetPort: 9000
+kind: Service
+apiVersion: v1
+metadata:
+  name: "kstreams-metrics"
+spec:
+  clusterIP: "None"
+  selector:
+    app: "stockstat-2"
+  ports:
+    - name: kstreams-metrics
+      protocol: TCP
+      port: 9000
+      targetPort: 9000
+---
+# Sensitive connection properties that we can set on the fly
+kind: Secret
+apiVersion: v1
+metadata:
+  name: streams-credentials
+type: Opaque
+data:
+  config: |-
+    Ym9vdHN0cmFwLnNlcnZlcnM9cGtjLWxnd2dtLmVhc3R1czIuYXp1cmUuY29uZmx1ZW50LmNsb3VkOjkwOTIKc2VjdXJpdHkucHJvdG9jb2w9U0FTTF9TU0wKc2FzbC5tZWNoYW5pc209UExBSU4Kc3RhdGUuZGlyPS92YXIva2Fma2Etc3RyZWFtcy8Kc2FzbC5qYWFzLmNvbmZpZz1vcmcuYXBhY2hlLmthZmthLmNvbW1vbi5zZWN1cml0eS5wbGFpbi5QbGFpbkxvZ2luTW9kdWxlIHJlcXVpcmVkIFwKdXNlcm5hbWU9IkpGWTJXVlc3RTRSRDdONlUiICAgXApwYXNzd29yZD0iOWlVV2lMdkNtNHU2aWZ3aUhEODJ3UzlrYmJQUmQ4bUJQNndTYWo5cHRWR3M1WGR2d1JIQ2tUbTNRWkhTbE5CbSI7Cgo=
+---
+# JMX configuration for our streams application
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: kstreams-jmx-config
+  labels:
+    name: kstreams-jmx-config
+  namespace: default
+data:
+  streams-jmx.yaml: |-
+    lowercaseOutputName: true
+    rules:
+      - pattern : 'kafka.streams<type=stream-metrics, client-id=(.*)><>(.+): (.+)'
+        value: 1
+        name: kafka_streams_app_info
+        labels:
+          client-id: $1
+          $2: $3
+        type: COUNTER
+      - pattern : 'kafka.streams<type=(.+), thread-id=(.+), task-id=(.*), (.+)=(.+)><>(.+):'
+        name: kafka_streams_$1_$6
+        type: GAUGE
+        labels:
+          thread-id: "$2"
+          task-id: "$3"
+          $4: "$5"
+      - pattern : 'kafka.streams<type=stream-task-metrics, thread-id=(.+), task-id=(.*)><>(.+):'
+        name: kafka_streams_stream-task-metrics_$3
+        type: GAUGE
+        labels:
+          thread-id: "$1"
+          task-id: "$2"
+      - pattern : 'kafka.streams<type=(.+), thread-id=(.+)><>(.+):'
+        name: kafka_streams_$1_$3
+        type: GAUGE
+        labels:
+          thread-id: "$2"
+      - pattern: 'kafka.consumer<type=app-info, client-id=(.+)><>(.+): (.+)'
+        value: 1
+        name: kafka_consumer_app_info
+        labels:
+          client-id: $1
+          $2: $3
+        type: UNTYPED
+      - pattern : 'kafka.consumer<type=(.+), client-id=(.+), node-id=(.+)><>(.+):'
+        name: kafka_consumer_$1_$4
+        type: GAUGE
+        labels:
+          client-id: "$2"
+          host-id: "$3"
+      - pattern : 'kafka.consumer<type=(.+), client-id=(.+), topic=(.+), partition=(.+)><>(.+):'
+        name: kafka_consumer_$1_$5
+        type: GAUGE
+        labels:
+          client-id: "$2"
+          topic: "$3"
+          partition: "$4"
+      - pattern : 'kafka.consumer<type=(.+), client-id=(.+), topic=(.+)><>(.+):'
+        name: kafka_consumer_$1_$4
+        type: GAUGE
+        labels:
+          client-id: "$2"
+          topic: "$3"
+      - pattern : 'kafka.consumer<type=(.+), client-id=(.+)><>(.+):'
+        name: kafka_consumer_$1_$3
+        type: GAUGE
+        labels:
+          client-id: "$2"
