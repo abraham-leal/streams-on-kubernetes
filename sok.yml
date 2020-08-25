@@ -51,6 +51,13 @@ spec:
           - containerPort: 9000
         image: "abereg.azurecr.io/streams-on-k8:latest"
         imagePullPolicy: Always
+        resources:
+          requests:
+            cpu: 500m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 1024Mi
         # Set env variables
         env:
         - name: JAVA_TOOL_OPTIONS
