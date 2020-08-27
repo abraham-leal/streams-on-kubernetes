@@ -1,5 +1,6 @@
 package com.shapira.examples.streams.stockstats;
 
+import com.leal.examples.streams.handlers.RocksDBMemHandle;
 import com.leal.examples.streams.handlers.sendToKafka;
 import com.leal.examples.streams.handlers.writeToLog;
 import com.leal.examples.streams.status.StreamsStatus;
@@ -48,6 +49,8 @@ public class StockStatsExample {
         props.put(StreamsConfig.NUM_STREAM_THREADS_CONFIG, 2);
         props.put(StreamsConfig.DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG, sendToKafka.class);
         props.put(StreamsConfig.DEFAULT_PRODUCTION_EXCEPTION_HANDLER_CLASS_CONFIG, writeToLog.class);
+        props.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, 1000000);
+        props.put(StreamsConfig.ROCKSDB_CONFIG_SETTER_CLASS_CONFIG, RocksDBMemHandle.class);
 
         // setting offset reset to earliest so that we can re-run the demo code with the same pre-loaded data
         // Note: To re-run the demo, you need to use the offset reset tool:

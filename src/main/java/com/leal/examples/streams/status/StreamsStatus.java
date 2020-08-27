@@ -1,10 +1,7 @@
 package com.leal.examples.streams.status;
 
-import org.apache.kafka.common.MetricName;
 import org.apache.kafka.streams.KafkaStreams;
-import org.apache.kafka.streams.StoreQueryParameters;
 import org.apache.kafka.streams.processor.ThreadMetadata;
-import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
@@ -14,10 +11,7 @@ import org.apache.log4j.Logger;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
 import javax.ws.rs.core.Response;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.Set;
 
 @Path("streams-check")
