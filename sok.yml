@@ -2,17 +2,17 @@
 apiVersion: apps/v1
 kind: "StatefulSet"
 metadata:
-  name: "stockstat-2"
+  name: "stockstats-2"
   namespace: "default"
   labels:
-    app: "stockstat-2"
+    app: "stockstats-2"
 spec:
-  replicas: 2
+  replicas: 6
   podManagementPolicy: "Parallel"
-  serviceName: "stockstat-2"
+  serviceName: "stockstats-2"
   selector:
     matchLabels:
-      app: "stockstat-2"
+      app: "stockstats-2"
   # Set the volume we want for our application
   volumeClaimTemplates:
     - metadata:
@@ -21,11 +21,11 @@ spec:
         accessModes: [ "ReadWriteOnce" ]
         resources:
           requests:
-            storage: 1Gi
+            storage: 20Gi
   template:
     metadata:
       labels:
-        app: "stockstat-2"
+        app: "stockstats-2"
     spec:
       volumes:
         #Pass in the sensitive properties for our streams application
@@ -37,7 +37,7 @@ spec:
           configMap:
             name: kstreams-jmx-config
       containers:
-      - name: "stockstat-2"
+      - name: "stockstats-2"
         # Mount the configmap and secret
         volumeMounts:
           - name: streams-jmx-config-volume
@@ -49,25 +49,21 @@ spec:
         # Expose port 9000
         ports:
           - containerPort: 9000
-        image: "abereg.azurecr.io/streams-on-k8:latest"
+        image: "gcr.io/solutionsarchitect-01/streams-on-k8s-demo:latest"
         imagePullPolicy: Always
         resources:
           requests:
             cpu: 500m
-            memory: 512Mi
+            memory: 2Gi
           limits:
             cpu: 1000m
-            memory: 1024Mi
-        # Set env variables
-        env:
-        - name: JAVA_TOOL_OPTIONS
-          value: -DLOGLEVEL=INFO
+            memory: 10Gi
         # Set liveness probe configs
         livenessProbe:
           httpGet:
             path: /streams-check/liveness
             port: 7000
-          initialDelaySeconds: 3
+          initialDelaySeconds: 30
           periodSeconds: 5
           failureThreshold: 5
         # Set readiness probe configs
@@ -75,7 +71,7 @@ spec:
           httpGet:
             path: /streams-check/readiness
             port: 7000
-          initialDelaySeconds: 3
+          initialDelaySeconds: 30
           periodSeconds: 5
           failureThreshold: 5
 ---
@@ -83,10 +79,11 @@ kind: Service
 apiVersion: v1
 metadata:
   name: "kstreams-metrics"
+  namespace: "default"
 spec:
   clusterIP: "None"
   selector:
-    app: "stockstat-2"
+    app: "stockstats-2"
   ports:
     - name: kstreams-metrics
       protocol: TCP
@@ -98,10 +95,11 @@ kind: Secret
 apiVersion: v1
 metadata:
   name: streams-credentials
+  namespace: "default"
 type: Opaque
 data:
   config: |-
-    Ym9vdHN0cmFwLnNlcnZlcnM9cGtjLWxnd2dtLmVhc3R1czIuYXp1cmUuY29uZmx1ZW50LmNsb3VkOjkwOTIKc2VjdXJpdHkucHJvdG9jb2w9U0FTTF9TU0wKc2FzbC5tZWNoYW5pc209UExBSU4Kc3RhdGUuZGlyPS92YXIva2Fma2Etc3RyZWFtcy8Kc2FzbC5qYWFzLmNvbmZpZz1vcmcuYXBhY2hlLmthZmthLmNvbW1vbi5zZWN1cml0eS5wbGFpbi5QbGFpbkxvZ2luTW9kdWxlIHJlcXVpcmVkIFwKdXNlcm5hbWU9IkpGWTJXVlc3RTRSRDdONlUiICAgXApwYXNzd29yZD0iOWlVV2lMdkNtNHU2aWZ3aUhEODJ3UzlrYmJQUmQ4bUJQNndTYWo5cHRWR3M1WGR2d1JIQ2tUbTNRWkhTbE5CbSI7Cgo=
+    Ym9vdHN0cmFwLnNlcnZlcnM9cGtjLTZvanYyLnVzLXdlc3Q0LmdjcC5jb25mbHVlbnQuY2xvdWQ6OTA5MgpzZWN1cml0eS5wcm90b2NvbD1TQVNMX1NTTApzYXNsLm1lY2hhbmlzbT1QTEFJTgpudW0uc3RhbmRieS5yZXBsaWNhcz0xCnN0YXRlLmRpcj0vdG1wL2thZmthLXN0cmVhbXMvCnNhc2wuamFhcy5jb25maWc9b3JnLmFwYWNoZS5rYWZrYS5jb21tb24uc2VjdXJpdHkucGxhaW4uUGxhaW5Mb2dpbk1vZHVsZSByZXF1aXJlZCBcCnVzZXJuYW1lPSI2VUFUVTVQN0pHSzI3RVNFIiAgIFwKcGFzc3dvcmQ9IkV2QUlJaEZXdVJZY2FlcnZNRFRaQmhmcEFXL0pJUHpXUDdOSmN4eENGeWNOTEtKNVZud0s5WTRxUmVwNkZ4cGIiOwo=
 ---
 # JMX configuration for our streams application
 kind: ConfigMap

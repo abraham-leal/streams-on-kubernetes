@@ -2,9 +2,13 @@ package com.shapira.examples.streams.stockstats;
 
 import com.shapira.examples.streams.stockstats.serde.JsonSerializer;
 import com.shapira.examples.streams.stockstats.model.Trade;
+import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.config.SaslConfigs;
+import org.apache.kafka.streams.StreamsConfig;
+import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
@@ -19,6 +23,7 @@ public class StockGenProducer {
     public static KafkaProducer<String, Trade> producer = null;
 
     public static void main(String[] args) throws Exception {
+        BasicConfigurator.configure();
 
         System.out.println("Press CTRL-C to stop generating data");
         Logger.getRootLogger().setLevel(Level.INFO);
@@ -44,6 +49,10 @@ public class StockGenProducer {
 
         props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
         props.put("value.serializer", tradeSerializer.getClass().getName());
+        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "pkc-6ojv2.us-west4.gcp.confluent.cloud:9092");
+        props.put(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG, "SASL_SSL");
+        props.put(SaslConfigs.SASL_JAAS_CONFIG, "org.apache.kafka.common.security.plain.PlainLoginModule   required username='6UATU5P7JGK27ESE'   password='EvAIIhFWuRYcaervMDTZBhfpAW/JIPzWP7NJcxxCFycNLKJ5VnwK9Y4qRep6Fxpb';");
+        props.put(SaslConfigs.SASL_MECHANISM, "PLAIN");
 
         // Starting producer
         producer = new KafkaProducer<>(props);

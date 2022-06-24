@@ -1,7 +1,7 @@
 package com.leal.examples.streams.status;
 
 import org.apache.kafka.streams.KafkaStreams;
-import org.apache.kafka.streams.processor.ThreadMetadata;
+import org.apache.kafka.streams.ThreadMetadata;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
@@ -82,7 +82,7 @@ public class StreamsStatus {
         Response check = Response.serverError().build();
 
         if (this.app.state().isRunningOrRebalancing()) {
-            Set<ThreadMetadata> myThreadsStatus = this.app.localThreadsMetadata();
+            Set<ThreadMetadata> myThreadsStatus = this.app.metadataForLocalThreads();
             check = Response.ok().build();
             logger.debug("Streams app is running");
             for (ThreadMetadata x : myThreadsStatus){
@@ -107,7 +107,7 @@ public class StreamsStatus {
     public Response getReadiness() {
         Response check = Response.serverError().build();
 
-        for (ThreadMetadata thread : this.app.localThreadsMetadata()) {
+        for (ThreadMetadata thread : this.app.metadataForLocalThreads()) {
             if (!thread.threadState().equalsIgnoreCase("RUNNING")){
                 logger.debug("At least one thread in the Streams app is not running, returning bad response.");
                 return check;

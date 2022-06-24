@@ -1,6 +1,7 @@
 package com.shapira.examples.streams.stockstats;
 
-import com.leal.examples.streams.handlers.RocksDBMemHandle;
+import com.leal.examples.streams.handlers.BoundedMemoryRocksDBConfig;
+import com.leal.examples.streams.handlers.BoundedMemoryRocksDBConfigSetter;
 import com.leal.examples.streams.handlers.sendToKafka;
 import com.leal.examples.streams.handlers.writeToLog;
 import com.leal.examples.streams.status.StreamsStatus;
@@ -15,13 +16,14 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.*;
+import org.apache.kafka.streams.errors.StreamsUncaughtExceptionHandler;
 import org.apache.kafka.streams.kstream.*;
 import org.apache.kafka.streams.state.WindowStore;
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 
 /**
@@ -34,28 +36,35 @@ public class StockStatsExample {
 
     public static void main(String[] args) throws Exception {
 
-        Logger.getRootLogger().setLevel(Level.INFO);
+        Properties props = new Properties();
 
-        Properties props;
-        if (args.length==1)
-            props = LoadConfigs.loadConfig(args[0]);
-        else
-            props = LoadConfigs.loadConfig();
-
+        // Overrideable properties
         props.put(StreamsConfig.APPLICATION_ID_CONFIG, "stockstat-2");
         props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
         props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, TradeSerde.class.getName());
-        props.put(StreamsConfig.METRICS_RECORDING_LEVEL_CONFIG, "INFO");
+        props.put(StreamsConfig.METRICS_RECORDING_LEVEL_CONFIG, "DEBUG");
         props.put(StreamsConfig.NUM_STREAM_THREADS_CONFIG, 2);
+        props.put(StreamsConfig.NUM_STANDBY_REPLICAS_CONFIG, "1");
+        props.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, 1000000);
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+
+        if (args.length==1)
+            props = LoadConfigs.loadConfig(props, args[0]);
+        else
+            props = LoadConfigs.loadConfig(props);
+
+        HashMap<String, Object> rocksDBConfigs = new HashMap<>();
+        rocksDBConfigs.put(BoundedMemoryRocksDBConfig.BLOCK_CACHE_SIZE, 2 * 1024 * 1024L);
+        rocksDBConfigs.put(BoundedMemoryRocksDBConfig.WRITE_BUFFER_LIMIT, 1024 * 1024L);
+        rocksDBConfigs.put(BoundedMemoryRocksDBConfig.N_BACKGROUND_THREADS_CONFIG, 1);
+
+        BoundedMemoryRocksDBConfigSetter boundMemory = new BoundedMemoryRocksDBConfigSetter();
+        boundMemory.configure(rocksDBConfigs);
+
+        // Non-overridable properties
         props.put(StreamsConfig.DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG, sendToKafka.class);
         props.put(StreamsConfig.DEFAULT_PRODUCTION_EXCEPTION_HANDLER_CLASS_CONFIG, writeToLog.class);
-        props.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, 1000000);
-        props.put(StreamsConfig.ROCKSDB_CONFIG_SETTER_CLASS_CONFIG, RocksDBMemHandle.class);
-
-        // setting offset reset to earliest so that we can re-run the demo code with the same pre-loaded data
-        // Note: To re-run the demo, you need to use the offset reset tool:
-        // https://cwiki.apache.org/confluence/display/KAFKA/Kafka+Streams+Application+Reset+Tool
-        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        props.put(StreamsConfig.ROCKSDB_CONFIG_SETTER_CLASS_CONFIG, boundMemory.getClass());
 
         // creating an AdminClient and checking the number of brokers in the cluster, so I'll know how many replicas we want...
         AdminClient ac = AdminClient.create(props);
@@ -72,9 +81,10 @@ public class StockStatsExample {
 
         KafkaStreams streams = new KafkaStreams(topology, props);
 
-        streams.setUncaughtExceptionHandler((t,e) -> {
+        streams.setUncaughtExceptionHandler((t) -> {
             log.warn("This is bound to die, so I just wanted to say goodbye... here is the culprit though: {}",
-                    e.getMessage());
+                    t.getMessage());
+            return StreamsUncaughtExceptionHandler.StreamThreadExceptionResponse.SHUTDOWN_APPLICATION;
         });
 
         streams.cleanUp();
@@ -99,22 +109,25 @@ public class StockStatsExample {
 
         KStream<String, Trade> source = builder.stream(Constants.STOCK_TOPIC);
 
-        KStream<String, Trade>[] healthCheck = source // We check whether this record will throw any exceptions
-                .branch(isNotValidRecord,isValidRecord); // by evaluating the predicates before entering the flow
+        Map<String, KStream<String, Trade>> healthCheck = source // We check whether this record will throw any exceptions
+                .split(Named.as("ExceptionCheck-"))
+                .branch(isNotValidRecord, Branched.as("IsNotValid"))
+                .branch(isValidRecord, Branched.as("IsValid"))
+                .noDefaultBranch(); // by evaluating the predicates before entering the flow
 
-        healthCheck[0].to("dlq-stockstat-noncompliant"); // We send non compliant records to a topic named
         // dlq-stockstat-noncompliant
+        healthCheck.get("ExceptionCheck-IsNotValid").to("dlq-stockstat-noncompliant"); // We send non compliant records to a topic named
 
-        KStream<Windowed<String>, TradeStats> stats = healthCheck[1]
+        KStream<Windowed<String>, TradeStats> stats = healthCheck.get("ExceptionCheck-IsValid")
                 .groupByKey()
-                .windowedBy(TimeWindows.of(Duration.ofMillis(5000)).advanceBy(Duration.ofMillis(1000)))
+                .windowedBy(TimeWindows.ofSizeAndGrace(Duration.ofMillis(5000),Duration.ofMillis(1000)).advanceBy(Duration.ofMillis(1000)))
                 .aggregate(TradeStats::new,(k, v, tradestats) -> tradestats.add(v),
                         Materialized.<String, TradeStats, WindowStore<Bytes, byte[]>>as("trade-aggregates")
                                 .withValueSerde(new TradeStatsSerde()))
                 .toStream()
                 .mapValues(TradeStats::computeAvgPrice);
 
-        stats.to("stockstats-output", Produced.keySerde(WindowedSerdes.timeWindowedSerdeFrom(String.class)));
+        stats.to("stockstats-output", Produced.keySerde(WindowedSerdes.timeWindowedSerdeFrom(String.class,5000L)));
 
         return builder;
     }

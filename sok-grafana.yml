@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: grafana-deployment
+  namespace: default
   labels:
     app: grafana
 spec:
@@ -31,6 +32,7 @@ spec:
 kind: Service
 apiVersion: v1
 metadata:
+  namespace: default
   name: grafana-service
 spec:
   selector:

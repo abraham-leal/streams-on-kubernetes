@@ -1,6 +1,0 @@
-1. Deploy Streams App as StatefulSet with 1 replica
-2. Deploy Lag Exporter
-3. Deploy Prometheus
-4. Deploy Grafana
-5. Deploy Metric-Reporter
-6. Deploy HPA

@@ -23,7 +23,7 @@ spec:
         target:
           type: AverageValue
           averageValue: "200"
-  maxReplicas: 3
+  maxReplicas: 9
   minReplicas: 1
   behavior:
     scaleDown:

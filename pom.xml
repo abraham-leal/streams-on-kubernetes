@@ -9,18 +9,10 @@
     <version>1.0-SNAPSHOT</version>
 
     <properties>
-        <kafka.version>2.6.0</kafka.version>
-        <confluent.version>5.5.1</confluent.version>
-        <avro.version>1.8.2</avro.version>
+        <kafka.version>3.2.0</kafka.version>
+        <confluent.version>7.2.0</confluent.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
-
-    <repositories>
-        <repository>
-            <id>confluent</id>
-            <url>http://packages.confluent.io/maven/</url>
-        </repository>
-    </repositories>
 
     <dependencies>
         <dependency>
@@ -44,8 +36,11 @@
             <artifactId>gson</artifactId>
             <version>2.2.2</version>
         </dependency>
-        <!--Binding for log4j version 1.2.x You also need to
-place log4j.jar on your class path. -->
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>23.0</version>
+        </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
@@ -89,11 +84,7 @@ place log4j.jar on your class path. -->
             <version>RELEASE</version>
             <scope>test</scope>
         </dependency>
-
     </dependencies>
-
-
-
 
     <build>
         <plugins>
@@ -102,48 +93,32 @@ place log4j.jar on your class path. -->
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.5.1</version>
                 <configuration>
-                    <source>1.8</source>
-                    <target>1.8</target>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>shade</goal>
-                        </goals>
-                    </execution>
-                </executions>
-                <configuration>
-                    <finalName>uber-${artifactId}-${version}</finalName>
+                    <source>11</source>
+                    <target>11</target>
                 </configuration>
             </plugin>
             <plugin>
                 <groupId>com.google.cloud.tools</groupId>
                 <artifactId>jib-maven-plugin</artifactId>
-                <version>2.4.0</version>
+                <version>3.2.1</version>
                 <configuration>
-                    <!-- add the config file I'm using. You can also remove this and place your file in src/main/jib -->
                     <from>
-                        <image>openjdk:8</image>
+                        <image>openjdk:11</image>
                     </from>
                     <to>
-                        <image>abereg.azurecr.io/streams-on-k8</image>
-                        <auth>
-                            <username>abeReg</username>
-                            <password>ebBU6dUnssIqQnHu23kr0R6waCOtD+3Z</password>
-                        </auth>
+                        <image>gcr.io/solutionsarchitect-01/streams-on-k8s-demo</image>
                     </to>
                     <container>
                         <mainClass>com.shapira.examples.streams.stockstats.StockStatsExample</mainClass>
                         <jvmFlags>
+                            <jvmFlag>-DLOGLEVEL=INFO -Xmx5120M -Xms512M</jvmFlag>
+                            <jvmFlag>-Xmx5120M</jvmFlag>
+                            <jvmFlag>-Xms512M</jvmFlag>
+                            <jvmFlag>-Dlog4j.configuration=file:/exporter/log4j.properties</jvmFlag>
                             <jvmFlag>-Dcom.sun.management.jmxremote</jvmFlag>
                             <jvmFlag>-Dcom.sun.management.jmxremote.port=8008</jvmFlag>
                             <jvmFlag>-Dcom.sun.management.jmxremote.authenticate=false</jvmFlag>
-                            <jvmFlag>-javaagent:/exporter/jmx_prometheus_javaagent-0.13.0.jar=9000:/exporter/configs/streams-jmx.yaml</jvmFlag>
+                            <jvmFlag>-javaagent:/exporter/jmx_prometheus_javaagent-0.17.0.jar=9000:/exporter/configs/streams-jmx.yaml</jvmFlag>
                         </jvmFlags>
                         <ports>
                             <port>8008</port>
